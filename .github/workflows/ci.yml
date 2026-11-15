@@ -67,4 +67,7 @@ jobs:
         # pandas 2.2 — версия, с которой тестируется PySpark 4.0
         run: pip install "pyspark==4.0.1" "pyarrow>=15" "pandas==2.2.3" "numpy<2.3" lightgbm==4.7.0 pydantic==2.12.5
       - name: Batch scoring on sample
+        # воркеры Spark — отдельные процессы Python: пакет app должен быть виден им через PYTHONPATH
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: python batch/spark_score.py --input tests/data/sample_applications.csv --output /tmp/scored
