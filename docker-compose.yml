@@ -1,0 +1,60 @@
+# docker compose up                       — только API на :8000
+# docker compose --profile monitoring up  — + Prometheus на :9090
+# BOT_TOKEN=... docker compose --profile bot up
+# docker compose --profile tracking up    — MLflow на :5000
+# docker compose --profile airflow up     — Airflow на :8080 (логин и пароль печатаются в лог)
+services:
+  api:
+    build: { context: ., target: api }
+    image: credit-scoring-service:latest
+    ports: ["8000:8000"]
+    environment:
+      LOG_LEVEL: INFO
+    restart: unless-stopped
+
+  bot:
+    build: { context: ., target: bot }
+    image: credit-scoring-bot:latest
+    profiles: ["bot"]
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:-}
+      API_URL: http://api:8000
+    depends_on:
+      api: { condition: service_healthy }
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.53.2
+    profiles: ["monitoring"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports: ["9090:9090"]
+    depends_on: [api]
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.17.2
+    profiles: ["tracking"]
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root /mlflow/artifacts
+    volumes: [mlflow:/mlflow]
+    ports: ["5000:5000"]
+
+  airflow:
+    image: apache/airflow:2.10.5-python3.12
+    profiles: ["airflow"]
+    command: standalone
+    environment:
+      PROJECT_DIR: /opt/project
+      DATA_DIR: /opt/data
+      MODEL_DIR: /opt/project/artifacts
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
+      _PIP_ADDITIONAL_REQUIREMENTS: lightgbm scikit-learn
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - .:/opt/project
+      - airflow-data:/opt/data
+    ports: ["8080:8080"]
+
+volumes:
+  mlflow:
+  airflow-data:

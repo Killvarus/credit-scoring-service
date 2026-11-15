@@ -1,0 +1,10 @@
+.git
+.github
+.venv
+data
+tests
+mlruns
+**/__pycache__
+*.md
+k8s
+airflow
