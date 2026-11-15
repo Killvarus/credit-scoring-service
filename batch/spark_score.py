@@ -41,7 +41,7 @@ def main():
 
     spark = SparkSession.builder.appName("credit-scoring-batch").getOrCreate()
     frame = spark.read.csv(args.input, header=True, inferSchema=True).select(*RAW_COLUMNS)
-    schema = frame.schema.add("pd", "double").add("score", "int").add("decision", "string")
+    schema = frame.schema.add("pd", "double").add("score", "long").add("decision", "string")
     scored = frame.mapInPandas(score_partitions(args.model), schema=schema)
     scored.write.mode("overwrite").parquet(args.output)
     summary = scored.groupBy("decision").count().collect()
