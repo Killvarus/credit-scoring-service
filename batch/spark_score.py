@@ -30,6 +30,7 @@ def score_partitions(model_dir: str):
 
 def main():
     from pyspark.sql import SparkSession
+    from pyspark.sql.types import DoubleType, LongType, StringType, StructField, StructType
 
     from app.features import RAW_COLUMNS
 
@@ -41,7 +42,9 @@ def main():
 
     spark = SparkSession.builder.appName("credit-scoring-batch").getOrCreate()
     frame = spark.read.csv(args.input, header=True, inferSchema=True).select(*RAW_COLUMNS)
-    schema = frame.schema.add("pd", "double").add("score", "long").add("decision", "string")
+    # Новая схема, а не frame.schema.add(...): add мутирует объект, который DataFrame может держать в кэше
+    schema = StructType([*frame.schema.fields, StructField("pd", DoubleType()), StructField("score", LongType()),
+                         StructField("decision", StringType())])
     scored = frame.mapInPandas(score_partitions(args.model), schema=schema)
     scored.write.mode("overwrite").parquet(args.output)
     summary = scored.groupBy("decision").count().collect()
